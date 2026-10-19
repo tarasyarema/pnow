@@ -22,6 +22,7 @@ pnow ("post now") is a tiny macOS menu bar app. A global hotkey opens a glass co
 | `Sources/pnow/HotKey.swift` | Carbon `RegisterEventHotKey`: no Accessibility permission needed |
 | `packaging/Info.plist` | Bundle template (`__VERSION__` is replaced). Bundle id `com.tarasyarema.pnow` |
 | `packaging/pnow.rb` | Cask template (`__VERSION__`, `__SHA256__`) |
+| `packaging/AppIcon.svg` | App icon source (pixel-art paper plane). `scripts/make-icon.sh` regenerates `AppIcon.icns` and the README `AppIcon.png` |
 | `scripts/dev.sh`, `scripts/build-app.sh`, `scripts/release.sh` | Run locally, build, release |
 
 ## dev-null.sh protocol

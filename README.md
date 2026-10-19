@@ -1,3 +1,5 @@
+<p align="center"><img src="packaging/AppIcon.png" width="128" alt="pnow icon: a pixel-art paper plane"></p>
+
 # pnow
 
 Post now. A tiny macOS menu bar app that posts to [dev-null.sh](https://dev-null.sh) from anywhere. X and LinkedIn come later.
@@ -46,6 +48,8 @@ scripts/dev.sh   # build, then run it in place of any installed pnow
 
 The local build shows as "pnow dev", never updates itself, and uses the same history. Only one pnow runs at a time: opening the installed copy (from Raycast, say) while the local build runs brings up the local composer. Quit it and open `/Applications/pnow.app` to go back.
 
+The app icon is `packaging/AppIcon.svg`. After you change it, run `scripts/make-icon.sh` to regenerate `AppIcon.icns` and the README image.
+
 ## Release
 
 ```sh
@@ -59,7 +63,6 @@ Installed copies update themselves with [Sparkle](https://sparkle-project.org): 
 
 ## TODO
 
-- [ ] App icon
 - [ ] Release from GitHub Actions
 - [ ] X
 - [ ] LinkedIn

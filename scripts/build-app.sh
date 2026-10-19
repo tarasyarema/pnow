@@ -16,8 +16,9 @@ swift build -c release --arch arm64 --arch x86_64
 BIN_DIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resources"
 cp "$BIN_DIR/pnow" "$APP/Contents/MacOS/pnow"
+cp packaging/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
 if [ "$SIGN_IDENTITY" = "-" ]; then
   # A local build shows as "dev", and Sparkle stays off so it never replaces itself.
