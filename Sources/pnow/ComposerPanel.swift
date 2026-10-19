@@ -7,7 +7,7 @@ import SwiftUI
 final class ComposerPanel: NSPanel {
     private let model: AppModel
 
-    init(model: AppModel) {
+    init(model: AppModel, checkForUpdates: @escaping () -> Void) {
         self.model = model
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: ComposerView.windowWidth, height: 200),
@@ -25,7 +25,7 @@ final class ComposerPanel: NSPanel {
         hidesOnDeactivate = false
         isMovableByWindowBackground = true
 
-        let hostingView = NSHostingView(rootView: ComposerView(model: model) { [weak self] height in
+        let hostingView = NSHostingView(rootView: ComposerView(model: model, checkForUpdates: checkForUpdates) { [weak self] height in
             self?.fit(height: height)
         })
         // The panel follows the SwiftUI height itself, keeping its top edge in place.

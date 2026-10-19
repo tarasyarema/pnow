@@ -42,11 +42,13 @@ scripts/build-app.sh && open build/pnow.app   # ad-hoc signed dev build
 ## Release
 
 ```sh
-scripts/release.sh 0.1.0 --dry-run   # build, sign, notarize, staple: publish nothing
-scripts/release.sh 0.1.0             # also tag, GitHub release, and bump the cask in tarasyarema/homebrew-tap
+scripts/release.sh patch --dry-run   # build, sign, notarize, staple: publish nothing
+scripts/release.sh patch             # or minor, major, 1.2.3: also tag, GitHub release, appcast, and cask bump
 ```
 
-Needs the "Developer ID Application" certificate in your keychain and a `pnow-notary` notarytool profile.
+Needs the "Developer ID Application" certificate in your keychain, a `pnow-notary` notarytool profile, and the Sparkle EdDSA key in your login keychain (`.build/artifacts/sparkle/Sparkle/bin/generate_keys`). Back that key up: without it, installed copies can't update.
+
+Installed copies update themselves with [Sparkle](https://sparkle-project.org): it checks `appcast.xml` on the latest GitHub release once a day. The menu shows the version, "Check for Updates…", and the GitHub link.
 
 ## TODO
 

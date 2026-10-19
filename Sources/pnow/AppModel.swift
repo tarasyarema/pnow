@@ -26,6 +26,8 @@ final class AppModel {
     var selection: Int?
     /// Bumped each time the composer opens, so the editor takes focus.
     var focusTick = 0
+    /// The version of a newer release, once Sparkle finds one.
+    var availableUpdate: String?
     let history = History()
 
     var canPost: Bool {

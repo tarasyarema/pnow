@@ -16,16 +16,26 @@ swift build -c release --arch arm64 --arch x86_64
 BIN_DIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/pnow" "$APP/Contents/MacOS/pnow"
 sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
 
+# Sparkle's XPC services are only for sandboxed apps, and pnow is not sandboxed.
+SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"
+ditto "$BIN_DIR/Sparkle.framework" "$SPARKLE"
+rm -rf "$SPARKLE/Versions/B/XPCServices" "$SPARKLE/XPCServices"
+
+# Sign from the inside out, without --deep. Notarization needs the hardened runtime and a
+# secure timestamp.
 if [ "$SIGN_IDENTITY" = "-" ]; then
-  codesign --force --sign - "$APP"
+  SIGN=(codesign --force --sign -)
 else
-  # Notarization needs the hardened runtime and a secure timestamp.
-  codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+  SIGN=(codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY")
 fi
-codesign --verify --strict "$APP"
+"${SIGN[@]}" "$SPARKLE/Versions/B/Autoupdate"
+"${SIGN[@]}" "$SPARKLE/Versions/B/Updater.app"
+"${SIGN[@]}" "$SPARKLE"
+"${SIGN[@]}" "$APP"
+codesign --verify --strict --deep "$APP"
 
 echo "Built $APP ($VERSION)"

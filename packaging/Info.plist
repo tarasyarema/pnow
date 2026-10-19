@@ -33,5 +33,11 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/tarasyarema/pnow/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>XXlkFUuDvmDOMz96XtWhOBsvoxxq2jbGYOYjQ2w6Wo4=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
 </dict>
 </plist>

@@ -8,6 +8,7 @@ struct ComposerView: View {
     private static let editorFont = Font.system(size: 20)
 
     @Bindable var model: AppModel
+    let checkForUpdates: () -> Void
     let onHeightChange: (CGFloat) -> Void
     @FocusState private var editorFocused: Bool
 
@@ -131,6 +132,16 @@ struct ComposerView: View {
         HStack(spacing: 8) {
             Image(systemName: "paperplane.fill")
             Text("dev-null.sh")
+            Text("·")
+            if let version = model.availableUpdate {
+                Button("Update to \(version)", action: checkForUpdates)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+            } else {
+                Link("pnow \(AppInfo.version)", destination: AppInfo.repository)
+                    .buttonStyle(.plain)
+                    .help("pnow on GitHub")
+            }
             Spacer()
             status
             if model.selection != nil {
