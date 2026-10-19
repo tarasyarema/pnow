@@ -12,14 +12,19 @@ Needs macOS 26 or later, and an SSH key that is on your GitHub account (dev-null
 
 | Key | Action |
 | --- | --- |
-| `⌘⌃P` | Open or close the composer, from any app |
+| `⌃⌘P` | Open or close the composer, from any app (change it in Settings) |
 | `⌘↩` | Post |
+| `⌘V` | Attach the image in your clipboard (up to 3). Dropping image files works too |
 | `⌘R` | Reply to your last post |
 | `↓` | Go into Recent. There: `↑` `↓` move, `↩` opens, `R` replies, `esc` goes back |
-| `⌘1` to `⌘5` | Open a recent post |
-| `⌥⌘1` to `⌥⌘5` | Reply to a recent post |
+| `⌘/` | Search all your posts |
+| `⌘1` to `⌘5` | Open a row |
+| `⌥⌘1` to `⌥⌘5` | Reply to a row |
 | `⌘⇧R` | Reply to the dev-null.sh post link in your clipboard |
-| `esc` | Cancel the reply, then close |
+| `⌘,` | Settings: hotkey, launch at login, composer at launch |
+| `esc` | Close the search, cancel the reply, then close |
+
+Replies show with `↳` in Recent.
 
 To reply to anyone's post, copy its link and press `⌘⇧R`, or paste the link into the empty composer.
 
@@ -36,8 +41,10 @@ History stays local, in `~/Library/Application Support/pnow/history.json`.
 ## Develop
 
 ```sh
-scripts/build-app.sh && open build/pnow.app   # ad-hoc signed dev build
+scripts/dev.sh   # build, then run it in place of any installed pnow
 ```
+
+The local build shows as "pnow dev", never updates itself, and uses the same history. Only one pnow runs at a time: opening the installed copy (from Raycast, say) while the local build runs brings up the local composer. Quit it and open `/Applications/pnow.app` to go back.
 
 ## Release
 
@@ -52,9 +59,6 @@ Installed copies update themselves with [Sparkle](https://sparkle-project.org): 
 
 ## TODO
 
-- [ ] Paste and drag-drop images (up to 3, 10 MB each)
-- [ ] Hotkey setting (fixed to `⌘⌃P` for now)
-- [ ] Launch at login
 - [ ] App icon
 - [ ] Release from GitHub Actions
 - [ ] X

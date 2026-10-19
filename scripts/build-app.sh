@@ -2,7 +2,7 @@
 #
 # Builds build/pnow.app (universal) and signs it.
 #
-#   scripts/build-app.sh                  # dev build, ad-hoc signed
+#   scripts/build-app.sh                  # local build, ad-hoc signed, no updates
 #   VERSION=0.1.0 SIGN_IDENTITY="Developer ID Application: ..." scripts/build-app.sh
 #
 set -euo pipefail
@@ -19,6 +19,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/pnow" "$APP/Contents/MacOS/pnow"
 sed "s/__VERSION__/$VERSION/g" packaging/Info.plist > "$APP/Contents/Info.plist"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+  # A local build shows as "dev", and Sparkle stays off so it never replaces itself.
+  plutil -replace PnowDevBuild -bool true "$APP/Contents/Info.plist"
+  plutil -remove SUFeedURL "$APP/Contents/Info.plist"
+fi
 
 # Sparkle's XPC services are only for sandboxed apps, and pnow is not sandboxed.
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework"

@@ -6,7 +6,7 @@ final class HotKey {
     private var handlerRef: EventHandlerRef?
     private let action: () -> Void
 
-    init(keyCode: Int, modifiers: Int, action: @escaping () -> Void) {
+    init(_ combo: HotKeyCombo, action: @escaping () -> Void) {
         self.action = action
 
         var pressed = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
@@ -19,6 +19,14 @@ final class HotKey {
         }, 1, &pressed, Unmanaged.passUnretained(self).toOpaque(), &handlerRef)
 
         let id = EventHotKeyID(signature: 0x706E_6F77, id: 1) // "pnow"
-        RegisterEventHotKey(UInt32(keyCode), UInt32(modifiers), id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        RegisterEventHotKey(UInt32(combo.keyCode), UInt32(combo.carbonModifiers), id, GetApplicationEventTarget(), 0, &hotKeyRef)
+    }
+
+    /// Call before dropping the last reference: Carbon keeps an unretained pointer to it.
+    func unregister() {
+        if let hotKeyRef { UnregisterEventHotKey(hotKeyRef) }
+        if let handlerRef { RemoveEventHandler(handlerRef) }
+        hotKeyRef = nil
+        handlerRef = nil
     }
 }

@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Posts to dev-null.sh the way `curl -fsSL https://dev-null.sh/commit | bash` does. There is no
@@ -8,7 +9,10 @@ enum DevNull {
 
     /// Returns the server's answer, which holds the link to the new commit. `replyTo` is the hash
     /// or the link of the commit to reply to.
-    static func commit(_ message: String, replyTo: String = "") async throws -> String {
+    static func commit(_ message: String, replyTo: String = "", images: [UploadImage] = []) async throws -> String {
+        guard images.count <= Attachments.limit else {
+            throw PnowError("A post can carry up to \(Attachments.limit) images.")
+        }
         // It goes on its own line of the signed payload.
         let replyCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:/._@-")
         guard replyTo.unicodeScalars.allSatisfy(replyCharacters.contains) else {
@@ -29,15 +33,37 @@ enum DevNull {
             throw PnowError("Unexpected answer from dev-null.sh.")
         }
 
-        // 2. Sign "<unix time>\n<nonce>\n<reply to>\n<message>". The reply line is empty for a new post.
+        // 2. Sign "<unix time>\n<nonce>\n<reply to>\n<message>". The reply line is empty for a new
+        // post. With images, a line of their SHA-256 hashes goes before the message.
         let nonce = (0..<16).map { _ in String(format: "%02x", UInt8.random(in: .min ... .max)) }.joined()
-        let payload = Data("\(Int(Date().timeIntervalSince1970))\n\(nonce)\n\(replyTo)\n\(message)".utf8)
+        var lines = ["\(Int(Date().timeIntervalSince1970))", nonce, replyTo]
+        if !images.isEmpty {
+            lines.append(images.map { SHA256.hash(data: $0.data).map { String(format: "%02x", $0) }.joined() }.joined(separator: ","))
+        }
+        lines.append(message)
+        let payload = Data(lines.joined(separator: "\n").utf8)
+        let namespace = images.isEmpty ? "devnull-commit" : "devnull-commit-images"
         let signature = try await Task.detached {
-            try SSH.sign(payload, with: key, namespace: "devnull-commit")
+            try SSH.sign(payload, with: key, namespace: namespace)
         }.value
 
-        // 3. Commit.
-        return try await send("/api/cli/commits", body: payload, signature: signature)
+        // 3. Commit: the payload is the raw body, or a form part next to the images.
+        guard !images.isEmpty else {
+            return try await send("/api/cli/commits", body: payload, signature: signature)
+        }
+        let boundary = "pnow-\(UUID().uuidString)"
+        var form = Data()
+        func addPart(name: String, filename: String, contentType: String, data: Data) {
+            form.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"; filename=\"\(filename)\"\r\nContent-Type: \(contentType)\r\n\r\n".utf8))
+            form.append(data)
+            form.append(Data("\r\n".utf8))
+        }
+        addPart(name: "payload", filename: "commit", contentType: "application/octet-stream", data: payload)
+        for (index, image) in images.enumerated() {
+            addPart(name: "images[]", filename: "image-\(index + 1).\(image.fileExtension)", contentType: image.mimeType, data: image.data)
+        }
+        form.append(Data("--\(boundary)--\r\n".utf8))
+        return try await send("/api/cli/commits", body: form, contentType: "multipart/form-data; boundary=\(boundary)", signature: signature, timeout: 600)
     }
 
     /// A post link, like https://dev-null.sh/@user/commits/<id>, without query or fragment.
@@ -60,11 +86,17 @@ enum DevNull {
         return author.map { "\($0)’s post \(id)" } ?? "post \(id)"
     }
 
-    private static func send(_ path: String, body: Data, signature: String? = nil) async throws -> String {
-        var request = URLRequest(url: base.appending(path: path), timeoutInterval: 30)
+    private static func send(
+        _ path: String,
+        body: Data,
+        contentType: String = "text/plain; charset=utf-8",
+        signature: String? = nil,
+        timeout: TimeInterval = 30
+    ) async throws -> String {
+        var request = URLRequest(url: base.appending(path: path), timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.httpBody = body
-        request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         if let signature {
             request.setValue(signature, forHTTPHeaderField: "X-SSH-Signature")
         }

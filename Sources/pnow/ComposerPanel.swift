@@ -7,7 +7,7 @@ import SwiftUI
 final class ComposerPanel: NSPanel {
     private let model: AppModel
 
-    init(model: AppModel, checkForUpdates: @escaping () -> Void) {
+    init(model: AppModel, checkForUpdates: @escaping () -> Void, openSettings: @escaping () -> Void) {
         self.model = model
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: ComposerView.windowWidth, height: 200),
@@ -25,7 +25,7 @@ final class ComposerPanel: NSPanel {
         hidesOnDeactivate = false
         isMovableByWindowBackground = true
 
-        let hostingView = NSHostingView(rootView: ComposerView(model: model, checkForUpdates: checkForUpdates) { [weak self] height in
+        let hostingView = NSHostingView(rootView: ComposerView(model: model, checkForUpdates: checkForUpdates, openSettings: openSettings) { [weak self] height in
             self?.fit(height: height)
         })
         // The panel follows the SwiftUI height itself, keeping its top edge in place.
@@ -36,8 +36,23 @@ final class ComposerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, handleListKey(event) { return }
+        if event.type == .keyDown, handlePaste(event) || handleListKey(event) || handleSearchEscape(event) { return }
         super.sendEvent(event)
+    }
+
+    /// ⌘V attaches images from the clipboard. Text pastes as usual.
+    private func handlePaste(_ event: NSEvent) -> Bool {
+        event.modifierFlags.intersection([.command, .option, .control, .shift]) == .command
+            && Int(event.keyCode) == kVK_ANSI_V
+            && model.search == nil
+            && model.pasteImages()
+    }
+
+    /// The search field would swallow esc.
+    private func handleSearchEscape(_ event: NSEvent) -> Bool {
+        guard Int(event.keyCode) == kVK_Escape, model.search != nil else { return false }
+        model.toggleSearch()
+        return true
     }
 
     /// ↓ at the end of the text moves into Recent. There, ↑ ↓ move, ↩ opens, R replies, esc goes
@@ -47,12 +62,12 @@ final class ComposerPanel: NSPanel {
         let key = Int(event.keyCode)
 
         guard let selection = model.selection else {
-            guard key == kVK_DownArrow, caretAtEnd, !model.history.posts.isEmpty else { return false }
+            guard key == kVK_DownArrow, caretAtEnd, !model.visiblePosts.isEmpty else { return false }
             model.selection = 0
             return true
         }
 
-        let post = model.history.posts[selection]
+        let post = model.visiblePosts[selection]
         switch key {
         case kVK_DownArrow: model.moveSelection(by: 1)
         case kVK_UpArrow: model.moveSelection(by: -1)
@@ -72,7 +87,7 @@ final class ComposerPanel: NSPanel {
         return range.length == 0 && range.location == (textView.string as NSString).length
     }
 
-    // Esc: cancel a reply first, then close.
+    // Esc: cancel a reply first, then close. The text and images stay for next time.
     override func cancelOperation(_ sender: Any?) {
         if model.replyingTo != nil {
             model.replyingTo = nil

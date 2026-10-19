@@ -10,6 +10,7 @@ struct Post: Codable, Identifiable {
     let response: String
     /// The link of the post this one replies to.
     var replyTo: String?
+    var imageCount: Int?
 
     /// The first link in the server's answer.
     var link: URL? {
@@ -17,9 +18,14 @@ struct Post: Codable, Identifiable {
         return detector?.firstMatch(in: response, range: NSRange(response.startIndex..., in: response))?.url
     }
 
+    /// The first line. Views truncate it to their width.
     var preview: String {
-        let firstLine = text.split(separator: "\n").first.map(String.init) ?? text
-        return firstLine.count > 48 ? firstLine.prefix(47) + "…" : firstLine
+        text.split(separator: "\n").first.map(String.init) ?? text
+    }
+
+    /// For menu items, which grow to fit their title.
+    var shortPreview: String {
+        preview.count > 48 ? preview.prefix(47) + "…" : preview
     }
 
     func open() {

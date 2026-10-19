@@ -33,6 +33,8 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>PnowDevBuild</key>
+	<false/>
 	<key>SUFeedURL</key>
 	<string>https://github.com/tarasyarema/pnow/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
