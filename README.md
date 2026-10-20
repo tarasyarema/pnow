@@ -2,7 +2,7 @@
 
 # pnow
 
-Post now. A tiny macOS menu bar app that posts to [dev-null.sh](https://dev-null.sh) from anywhere. X and LinkedIn come later.
+Post now. A tiny macOS menu bar app that posts to [dev-null.sh](https://dev-null.sh) and X from anywhere. LinkedIn comes later.
 
 ```sh
 brew install --cask tarasyarema/tap/pnow
@@ -16,19 +16,26 @@ Needs macOS 26 or later, and an SSH key that is on your GitHub account (dev-null
 | --- | --- |
 | `⌃⌘P` | Open or close the composer, from any app (change it in Settings) |
 | `⌘↩` | Post |
+| `⇥` or `⌘T` | Post to dev-null.sh, X, or both (`⇧⇥` goes back) |
 | `⌘V` | Attach the image in your clipboard (up to 3). Dropping image files works too |
 | `⌘R` | Reply to your last post |
-| `↓` | Go into Recent. There: `↑` `↓` move, `↩` opens, `R` replies, `esc` goes back |
+| `↓` | Go into Recent. There: `↑` `↓` move, `↩` opens, `X` opens on X, `R` replies, `esc` goes back |
 | `⌘/` | Search all your posts |
 | `⌘1` to `⌘5` | Open a row |
 | `⌥⌘1` to `⌥⌘5` | Reply to a row |
-| `⌘⇧R` | Reply to the dev-null.sh post link in your clipboard |
-| `⌘,` | Settings: hotkey, launch at login, composer at launch |
+| `⌘⇧R` | Reply to the dev-null.sh or X post link in your clipboard |
+| `⌘,` | Settings: hotkey, launch at login, composer at launch, X account |
 | `esc` | Close the search, cancel the reply, then close |
 
 Replies show with `↳` in Recent.
 
 To reply to anyone's post, copy its link and press `⌘⇧R`, or paste the link into the empty composer.
+
+### X
+
+pnow posts to X through your own X developer app, and X bills it about $0.015 a post. Set it up once with [the X guide](docs/x-setup.md), then paste the app's client ID in Settings and click Connect.
+
+X's API takes replies only in your own threads: a reply to someone else's X post opens X's composer in your browser, with your text filled in. A post on X shows an `X` badge in Recent. X counts 280 characters, links as 23, and the composer shows the count.
 
 Opening the app again (Raycast, Spotlight, Finder) also brings up the composer. So does the URL scheme, for Raycast quicklinks and bookmarklets:
 
@@ -64,5 +71,5 @@ Installed copies update themselves with [Sparkle](https://sparkle-project.org): 
 ## TODO
 
 - [ ] Release from GitHub Actions
-- [ ] X
+- [x] X
 - [ ] LinkedIn

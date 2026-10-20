@@ -1,6 +1,6 @@
 # pnow
 
-pnow ("post now") is a tiny macOS menu bar app. A global hotkey opens a glass composer that posts to [dev-null.sh](https://dev-null.sh). X and LinkedIn come later. It ships as a signed, notarized Homebrew cask (`brew install --cask tarasyarema/tap/pnow`) and updates itself with Sparkle.
+pnow ("post now") is a tiny macOS menu bar app. A global hotkey opens a glass composer that posts to [dev-null.sh](https://dev-null.sh), X, or both. LinkedIn comes later. It ships as a signed, notarized Homebrew cask (`brew install --cask tarasyarema/tap/pnow`) and updates itself with Sparkle.
 
 ## Stack and layout
 
@@ -15,6 +15,7 @@ pnow ("post now") is a tiny macOS menu bar app. A global hotkey opens a glass co
 | `Sources/pnow/ComposerView.swift` | The SwiftUI composer: editor, attachments, Recent/search, action bar |
 | `Sources/pnow/AppModel.swift` | State: draft, reply target, search, selection, attachments, posting |
 | `Sources/pnow/DevNull.swift` | The dev-null.sh client, a port of `curl -fsSL https://dev-null.sh/commit` |
+| `Sources/pnow/X.swift` | The X client: PKCE login, tokens in the keychain, image upload, posts, link parsing, the 280 counter |
 | `Sources/pnow/SSH.swift` | Key discovery (agents incl. `IdentityAgent` from `ssh -G`, `~/.ssh/*.pub`) and `ssh-keygen -Y sign` |
 | `Sources/pnow/Attachments.swift` | Clipboard and file images, converted to PNG/JPEG up to 10 MB |
 | `Sources/pnow/History.swift` | Local history in `~/Library/Application Support/pnow/history.json`. Nothing is fetched |
@@ -35,6 +36,18 @@ There is no login. pnow signs each post with a local SSH key that is on the user
 
 The answer is plain text with the post link, for example `Committed: https://dev-null.sh/@user/commits/<id> (pending review, ...)`. `<reply to>` is that link.
 
+## X
+
+pnow posts through the official X API v2. Each user brings their own X developer app ([docs/x-setup.md](docs/x-setup.md)), and the repo ships no client ID. The client ID is in `~/.config/pnow/config.json` (`{"x": {"clientID": "..."}}`), set from Settings or by hand. Taras's app, "pnow", is in his personal X developer account (not desplegalabs, which runs Agent Swarm).
+
+- Pay per use: X bills the app owner, $0.015 a post and $0.20 a post with a link. With your own app, you pay only for your own posts, and a fork cannot spend anyone else's credits.
+- X's restricted-use policy says that requiring end users to register their own apps "could result in enforcement". Taras chose this anyway (2026-10-20). Do not ship a shared client ID without asking him.
+- Login: OAuth 2.0 with PKCE as a public "Native App" client (no secret), in `ASWebAuthenticationSession`, with the callback `pnow://oauth/x`. Taras's app also has `http://127.0.0.1:52817/oauth/x`, unused for now. Scopes: `tweet.read tweet.write users.read media.write offline.access`. A new client ID logs you out.
+- Tokens: in the login keychain (service `com.tarasyarema.pnow`, account `x-tokens`). Access tokens last 2 hours. Each refresh also replaces the refresh token. The handle is in UserDefaults (`xUsername`).
+- Images: `POST /2/media/upload` (multipart, `media_category=tweet_image`), up to 5 MB, so bigger ones become a smaller JPEG. Then `POST /2/tweets` with `media.media_ids` and `reply.in_reply_to_tweet_id`.
+- Replies: the API takes a reply only in your own thread, or when the author mentions you. Replies to other people's X posts open `https://x.com/intent/tweet?text=...&in_reply_to=<id>` in the browser instead, and images go on the clipboard.
+- ⇥ and ⌘T cycle the destination: dev-null.sh, X, both. A reply goes only where its post is. When one of two places fails, the text stays, set to go only to the failed one.
+
 ## Development
 
 ```sh
@@ -45,10 +58,11 @@ swift build           # fast compile check
 - The local build is the pnow Taras runs while developing. It shows as "pnow dev", has no Sparkle feed (it never updates itself), and shares the history file.
 - Only one pnow runs at a time. A second launch (Raycast opens `/Applications/pnow.app`) hands its request to the running one and quits. The running one also force-quits older copies without the hand-off. Go back to the brew copy: quit pnow, then `open /Applications/pnow.app`.
 - The `x86_64 architecture is deprecated` warning from the universal build is expected.
+- Local builds are signed with the Developer ID when it is in the keychain (no notarization). The keychain then treats them and the brew copy as the same app, so the X login works in both without a password prompt.
 
 <important if="you are testing or verifying a change to pnow">
 
-- NEVER post to dev-null.sh to test. Posts are public and signed as Taras. Taras makes every real post, including the first test of a new posting path.
+- NEVER post to dev-null.sh or X to test. Posts are public and signed as Taras, and each X post costs money. Taras makes every real post, including the first test of a new posting path. Do not call the X API with his tokens either.
 - To test signing without posting: compile `Sources/pnow/SSH.swift` with a small `main.swift` (define `PnowError` there), sign a dummy payload, and check it with `ssh-keygen -Y check-novalidate -n devnull-commit -s <sig>`.
 - NEVER send synthetic keystrokes or clicks (`osascript ... System Events`, CGEvent) to Taras's Mac. Ask Taras to press keys.
 - To look at the UI, capture only the panel region, not the full screen: find the pnow window at layer 3 with `CGWindowListCopyWindowInfo`, then `screencapture -x -R x,y,w,h`. Taras has 3 displays, and the panel opens on the one with the mouse.
@@ -84,5 +98,6 @@ Installed copies find the update through `https://github.com/tarasyarema/pnow/re
   - `brew info --cask tarasyarema/tap/pnow` shows the new version.
   - `brew audit --cask --online tarasyarema/tap/pnow` passes.
   - The appcast at the `latest/download` URL shows the new `sparkle:version`.
+- Your X client ID must never reach git. The release refuses to run when it finds the ID from `~/.config/pnow/config.json` in a tracked file or in the history. A local pre-commit hook (`.git/hooks/pre-commit`, not in git) also blocks a commit that adds it.
 - Releases happen from this Mac, not CI. CI would need the Developer ID `.p12`, a notary key, a tap token, and the Sparkle key as secrets.
 </important>

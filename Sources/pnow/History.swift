@@ -4,15 +4,18 @@ import Observation
 struct Post: Codable, Identifiable {
     var id = UUID()
     var date = Date()
+    /// Where it went: "dev-null.sh", "X", or "dev-null.sh + X".
     let target: String
     let text: String
-    /// The server's answer, kept as-is.
+    /// dev-null.sh's answer, kept as-is. Empty when the post went to X only.
     let response: String
     /// The link of the post this one replies to.
     var replyTo: String?
     var imageCount: Int?
+    /// The post on X.
+    var xLink: URL?
 
-    /// The first link in the server's answer.
+    /// The dev-null.sh post: the first link in its answer.
     var link: URL? {
         let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
         return detector?.firstMatch(in: response, range: NSRange(response.startIndex..., in: response))?.url
@@ -28,8 +31,10 @@ struct Post: Codable, Identifiable {
         preview.count > 48 ? preview.prefix(47) + "…" : preview
     }
 
+    var canReply: Bool { link != nil || xLink != nil }
+
     func open() {
-        NSWorkspace.shared.open(link ?? DevNull.base)
+        NSWorkspace.shared.open(link ?? xLink ?? DevNull.base)
     }
 }
 

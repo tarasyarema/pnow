@@ -42,6 +42,13 @@ ZIP="build/pnow-$VERSION.zip"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "the version must look like 1.2.3."
 echo "Releasing pnow $VERSION (last release: ${LAST:-none})"
 
+# Your X client ID lives in ~/.config/pnow/config.json and must never reach git.
+X_CLIENT_ID="$(plutil -extract x.clientID raw "$HOME/.config/pnow/config.json" 2> /dev/null || true)"
+if [ -n "$X_CLIENT_ID" ]; then
+  ! git grep -qF "$X_CLIENT_ID" || fail "your X client ID is in a tracked file."
+  [ -z "$(git log --all --format=%h -S"$X_CLIENT_ID")" ] || fail "your X client ID is in the git history."
+fi
+
 if [ "$DRY_RUN" != "--dry-run" ]; then
   [ -z "$(git status --porcelain)" ] || fail "commit your changes first."
   [ "$(git branch --show-current)" = main ] || fail "release from main."

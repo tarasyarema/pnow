@@ -82,8 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showSettings() {
         panel?.orderOut(nil)
+        model.x.reloadClientID()
         if settingsWindow == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(preferences: model.preferences)))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(preferences: model.preferences, x: model.x)))
             window.title = "pnow Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false

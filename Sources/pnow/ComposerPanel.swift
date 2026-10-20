@@ -36,7 +36,7 @@ final class ComposerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, handlePaste(event) || handleListKey(event) || handleSearchEscape(event) { return }
+        if event.type == .keyDown, handlePaste(event) || handleTab(event) || handleListKey(event) || handleSearchEscape(event) { return }
         super.sendEvent(event)
     }
 
@@ -48,6 +48,16 @@ final class ComposerPanel: NSPanel {
             && model.pasteImages()
     }
 
+    /// ⇥ switches where the post goes (⇧⇥ back), in place of typing a tab.
+    private func handleTab(_ event: NSEvent) -> Bool {
+        guard Int(event.keyCode) == kVK_Tab,
+              event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
+              model.search == nil
+        else { return false }
+        model.cycleDestination(backwards: event.modifierFlags.contains(.shift))
+        return true
+    }
+
     /// The search field would swallow esc.
     private func handleSearchEscape(_ event: NSEvent) -> Bool {
         guard Int(event.keyCode) == kVK_Escape, model.search != nil else { return false }
@@ -55,8 +65,8 @@ final class ComposerPanel: NSPanel {
         return true
     }
 
-    /// ↓ at the end of the text moves into Recent. There, ↑ ↓ move, ↩ opens, R replies, esc goes
-    /// back, and any other key goes back to the text.
+    /// ↓ at the end of the text moves into Recent. There, ↑ ↓ move, ↩ opens, X opens on X, R
+    /// replies, esc goes back, and any other key goes back to the text.
     private func handleListKey(_ event: NSEvent) -> Bool {
         guard event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else { return false }
         let key = Int(event.keyCode)
@@ -73,6 +83,7 @@ final class ComposerPanel: NSPanel {
         case kVK_UpArrow: model.moveSelection(by: -1)
         case kVK_Return, kVK_ANSI_KeypadEnter: post.open()
         case kVK_ANSI_R: model.reply(to: post)
+        case kVK_ANSI_X: if let xLink = post.xLink { NSWorkspace.shared.open(xLink) }
         case kVK_Escape: model.selection = nil
         default:
             model.selection = nil

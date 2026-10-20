@@ -199,10 +199,16 @@ struct ComposerView: View {
     /// keys replace the post keys instead of crowding them.
     private var actionBar: some View {
         HStack(spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: "paperplane.fill")
-                Text("dev-null.sh")
+            Button { model.cycleDestination() } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "paperplane.fill")
+                    Text(model.destination.label)
+                    Keycap("⇥")
+                }
             }
+            .buttonStyle(.hover)
+            .keyboardShortcut("t", modifiers: .command)
+            .help("Where it posts. ⇥ or ⌘T switches")
             HStack(spacing: 2) {
                 if let version = model.availableUpdate {
                     Button("Update to \(version)", action: checkForUpdates)
@@ -234,16 +240,20 @@ struct ComposerView: View {
 
             if model.selection != nil {
                 Hint("Open", key: "↩")
+                if model.selectedPost?.xLink != nil {
+                    Hint("On X", key: "X")
+                }
                 Hint("Reply", key: "R")
                 Hint("Back", key: "esc")
             } else {
+                xCounter
                 status
                 Button(action: replyToLatest) {
                     Hint(model.replyingTo == nil ? "Reply to last" : "Cancel reply", key: "⌘R")
                 }
                 .buttonStyle(.hover)
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(model.replyingTo == nil && model.history.posts.first?.link == nil)
+                .disabled(model.replyingTo == nil && !(model.history.posts.first?.canReply ?? false))
                 Button { Task { await model.post() } } label: {
                     Hint("Post", key: "⌘↩")
                         .foregroundStyle(.primary)
@@ -266,6 +276,18 @@ struct ComposerView: View {
             model.replyingTo = nil
         } else if let latest = model.history.posts.first {
             model.reply(to: latest)
+        }
+    }
+
+    /// X's 280 limit, while the post goes there.
+    @ViewBuilder
+    private var xCounter: some View {
+        if model.destination.includesX, !model.draft.isEmpty {
+            let length = model.xLength
+            Text("\(length)/\(XText.limit)")
+                .monospacedDigit()
+                .foregroundStyle(length > XText.limit ? AnyShapeStyle(.red) : length > XText.limit - 20 ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+                .fixedSize()
         }
     }
 
@@ -323,6 +345,17 @@ private struct RecentRow: View {
             .keyboardShortcut(shortcut([.command]))
             .help(post.replyTo == nil ? "Open" : "Open your reply")
 
+            if let xLink = post.xLink {
+                Link(destination: xLink) {
+                    Text("X")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 18)
+                        .background(.quaternary, in: .rect(cornerRadius: 5))
+                }
+                .help("Open on X")
+            }
+
             // One slot at the right edge: the ⌘ number, or the reply button on hover.
             ZStack {
                 if let number {
@@ -337,7 +370,7 @@ private struct RecentRow: View {
                 }
                 .keyboardShortcut(shortcut([.command, .option]))
                 .help(number.map { "Reply (⌥⌘\($0))" } ?? "Reply")
-                .disabled(post.link == nil)
+                .disabled(!post.canReply)
                 .opacity(showsReply ? 1 : 0)
                 .allowsHitTesting(showsReply)
             }

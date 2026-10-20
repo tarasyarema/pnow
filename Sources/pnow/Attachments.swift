@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import UniformTypeIdentifiers
 
 /// An image the way dev-null.sh takes it: PNG, JPEG or WebP, up to 10 MB.
@@ -8,6 +9,35 @@ nonisolated struct UploadImage: Sendable {
     let data: Data
     let mimeType: String
     let fileExtension: String
+
+    /// The image as it is when it fits in `maxBytes`, else a JPEG, scaled down until it fits.
+    func fitting(_ maxBytes: Int) throws -> UploadImage {
+        guard data.count > maxBytes else { return self }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int
+        else { throw PnowError("Could not read the image.") }
+
+        var side = max(width, height)
+        while side >= 512 {
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: side,
+            ]
+            let jpeg = NSMutableData()
+            if let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
+               let destination = CGImageDestinationCreateWithData(jpeg, UTType.jpeg.identifier as CFString, 1, nil) {
+                CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+                if CGImageDestinationFinalize(destination), jpeg.length <= maxBytes {
+                    return UploadImage(data: jpeg as Data, mimeType: "image/jpeg", fileExtension: "jpg")
+                }
+            }
+            side = side * 3 / 4
+        }
+        throw PnowError("The image is too large (over \(maxBytes / 1_000_000) MB).")
+    }
 }
 
 struct Attachment: Identifiable {
