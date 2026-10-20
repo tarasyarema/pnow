@@ -11,14 +11,14 @@ pnow ("post now") is a tiny macOS menu bar app. A global hotkey opens a glass co
 | Path | What |
 | --- | --- |
 | `Sources/pnow/PnowApp.swift` | App entry, `AppDelegate` (one-instance hand-off, hotkey, Sparkle, `pnow://` URLs, settings window), menu bar menu |
-| `Sources/pnow/ComposerPanel.swift` | The floating `NSPanel`: show/hide, centering, list keys (↓ ↑ ↩ R esc), ⌘V image paste |
+| `Sources/pnow/ComposerPanel.swift` | The floating `NSPanel`: show/hide, centering, list keys (↓ ↑ ↩ R esc), ⌘V image paste, ⇥ destination, @ handle suggestions |
 | `Sources/pnow/ComposerView.swift` | The SwiftUI composer: editor, attachments, Recent/search, action bar |
 | `Sources/pnow/AppModel.swift` | State: draft, reply target, search, selection, attachments, posting |
 | `Sources/pnow/DevNull.swift` | The dev-null.sh client, a port of `curl -fsSL https://dev-null.sh/commit` |
 | `Sources/pnow/X.swift` | The X client: PKCE login, tokens in the keychain, image upload, posts, link parsing, the 280 counter |
 | `Sources/pnow/SSH.swift` | Key discovery (agents incl. `IdentityAgent` from `ssh -G`, `~/.ssh/*.pub`) and `ssh-keygen -Y sign` |
 | `Sources/pnow/Attachments.swift` | Clipboard and file images, converted to PNG/JPEG up to 10 MB |
-| `Sources/pnow/History.swift` | Local history in `~/Library/Application Support/pnow/history.json`. Nothing is fetched |
+| `Sources/pnow/History.swift` | Local history in `~/Library/Application Support/pnow/history.json`, and the handles for @ suggestions. Nothing is fetched |
 | `Sources/pnow/Settings.swift` | Preferences (hotkey, launch at login, composer at launch) and the settings view |
 | `Sources/pnow/HotKey.swift` | Carbon `RegisterEventHotKey`: no Accessibility permission needed |
 | `packaging/Info.plist` | Bundle template (`__VERSION__` is replaced). Bundle id `com.tarasyarema.pnow` |
@@ -36,6 +36,8 @@ There is no login. pnow signs each post with a local SSH key that is on the user
 
 The answer is plain text with the post link, for example `Committed: https://dev-null.sh/@user/commits/<id> (pending review, ...)`. `<reply to>` is that link.
 
+@ suggestions search users with `GET /search/users?q=<text>` (JSON `users[].username`, `name`). That is the website's own search, not the CLI API: no login, a rate limit of 120 a minute, and it may change without notice. pnow treats any failure as no results.
+
 ## X
 
 pnow posts through the official X API v2. Each user brings their own X developer app ([docs/x-setup.md](docs/x-setup.md)), and the repo ships no client ID. The client ID is in `~/.config/pnow/config.json` (`{"x": {"clientID": "..."}}`), set from Settings or by hand. Taras's app, "pnow", is in his personal X developer account (not desplegalabs, which runs Agent Swarm).
@@ -46,6 +48,7 @@ pnow posts through the official X API v2. Each user brings their own X developer
 - Tokens: in the login keychain (service `com.tarasyarema.pnow`, account `x-tokens`). Access tokens last 2 hours. Each refresh also replaces the refresh token. The handle is in UserDefaults (`xUsername`).
 - Images: `POST /2/media/upload` (multipart, `media_category=tweet_image`), up to 5 MB, so bigger ones become a smaller JPEG. Then `POST /2/tweets` with `media.media_ids` and `reply.in_reply_to_tweet_id`.
 - Replies: the API takes a reply only in your own thread, or when the author mentions you. Replies to other people's X posts open `https://x.com/intent/tweet?text=...&in_reply_to=<id>` in the browser instead, and images go on the clipboard.
+- @ suggestions on X use `GET /2/users/search?query=<text>&max_results=5`. X bills $0.01 per user found, so pnow searches only after 2 letters and a 400 ms pause, caches results for the session, and Settings can turn it off.
 - ⇥ and ⌘T cycle the destination: dev-null.sh, X, both. A reply goes only where its post is. When one of two places fails, the text stays, set to go only to the failed one.
 
 ## Development

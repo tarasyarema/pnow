@@ -61,6 +61,38 @@ final class History {
         }
     }
 
+    /// The handles you mentioned or replied to on dev-null.sh, or on X, most used first. Your own
+    /// handle is left out.
+    func handles(onX: Bool) -> [String] {
+        var seen: [String: (handle: String, count: Int, order: Int)] = [:]
+        var own = Set<String>()
+        func add(_ handle: String) {
+            let order = seen.count
+            seen[handle.lowercased(), default: (handle, 0, order)].count += 1
+        }
+        for post in posts where onX ? post.xLink != nil : post.link != nil {
+            let mine = onX ? post.xLink.flatMap { XPostLink($0.absoluteString)?.username } : post.link.flatMap(DevNull.author(of:))
+            if let mine { own.insert(mine.lowercased()) }
+            Self.mentions(in: post.text).forEach(add)
+            if let replyTo = post.replyTo,
+               let author = onX ? XPostLink(replyTo)?.username : URL(string: replyTo).flatMap(DevNull.author(of:)) {
+                add(author)
+            }
+        }
+        return seen.filter { !own.contains($0.key) }.values
+            .sorted { ($0.count, -$0.order) > ($1.count, -$1.order) }
+            .map(\.handle)
+    }
+
+    /// "@name" that starts a word: not the middle of an email address.
+    private static let mention = try! NSRegularExpression(pattern: "(?<![A-Za-z0-9_@.-])@([A-Za-z0-9_-]{1,39})")
+
+    private static func mentions(in text: String) -> [String] {
+        mention.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap {
+            Range($0.range(at: 1), in: text).map { String(text[$0]) }
+        }
+    }
+
     func add(_ post: Post) {
         posts.insert(post, at: 0)
         let encoder = JSONEncoder()

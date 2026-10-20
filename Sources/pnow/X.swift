@@ -26,6 +26,8 @@ final class XAccount {
     }
     private(set) var connecting = false
     @ObservationIgnored private var session: ASWebAuthenticationSession?
+    /// One refresh at a time: each one replaces the refresh token, so a second would fail.
+    @ObservationIgnored private var refreshing: Task<String, any Error>?
     @ObservationIgnored private let anchor = Anchor()
 
     var isConnected: Bool { username != nil }
@@ -129,6 +131,24 @@ final class XAccount {
         return XPostLink(username: username, id: created.data.id).url
     }
 
+    /// X users for `query`, 5 at most: X bills $0.01 for each user a search finds.
+    func searchUsers(_ query: String) async throws -> [Handle] {
+        struct Found: Decodable {
+            struct User: Decodable {
+                let username: String
+                let name: String?
+            }
+            let data: [User]?
+        }
+        let token = try await accessToken()
+        var search = URLComponents(url: Self.api.appending(path: "users/search"), resolvingAgainstBaseURL: false)!
+        search.queryItems = [URLQueryItem(name: "query", value: query), URLQueryItem(name: "max_results", value: "5")]
+        var request = URLRequest(url: search.url!, timeoutInterval: 10)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let found: Found = try await send(request)
+        return (found.data ?? []).map { Handle(username: $0.username, name: $0.name) }
+    }
+
     /// X's API takes replies only in your own threads, or when the author mentions you. Other
     /// replies open X's composer in the browser instead, with the text filled in.
     func canReplyWithAPI(to post: XPostLink) -> Bool {
@@ -176,18 +196,24 @@ final class XAccount {
             throw PnowError("Connect your X account in Settings (⌘,).")
         }
         guard tokens.expiresAt < Date().addingTimeInterval(60) else { return tokens.accessToken }
-        do {
-            let fresh = try await requestTokens([
-                ("grant_type", "refresh_token"),
-                ("refresh_token", tokens.refreshToken),
-                ("client_id", clientID),
-            ])
-            try save(fresh)
-            return fresh.accessToken
-        } catch let error as XError where error.status == 400 || error.status == 401 {
-            forget()
-            throw PnowError("Your X login expired. Connect X again in Settings (⌘,).")
+        if let refreshing { return try await refreshing.value }
+        let refresh = Task {
+            do {
+                let fresh = try await requestTokens([
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", tokens.refreshToken),
+                    ("client_id", clientID),
+                ])
+                try save(fresh)
+                return fresh.accessToken
+            } catch let error as XError where error.status == 400 || error.status == 401 {
+                forget()
+                throw PnowError("Your X login expired. Connect X again in Settings (⌘,).")
+            }
         }
+        refreshing = refresh
+        defer { refreshing = nil }
+        return try await refresh.value
     }
 
     private func requestTokens(_ fields: [(String, String)]) async throws -> Tokens {

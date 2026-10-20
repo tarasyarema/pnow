@@ -81,6 +81,10 @@ final class Preferences {
     var showComposerAtLaunch: Bool {
         didSet { UserDefaults.standard.set(showComposerAtLaunch, forKey: "showComposerAtLaunch") }
     }
+    /// Typing @ while posting to X searches X users, which X bills.
+    var searchXUsers: Bool {
+        didSet { UserDefaults.standard.set(searchXUsers, forKey: "searchXUsers") }
+    }
     /// Where new posts go. ⇥ and ⌘T change it.
     var destination: Destination {
         didSet { UserDefaults.standard.set(destination.rawValue, forKey: "destination") }
@@ -92,6 +96,7 @@ final class Preferences {
         hotKey = saved ?? .standard
         showComposerAtLaunch = UserDefaults.standard.object(forKey: "showComposerAtLaunch") as? Bool ?? true
         destination = UserDefaults.standard.string(forKey: "destination").flatMap(Destination.init(rawValue:)) ?? .devNull
+        searchXUsers = UserDefaults.standard.object(forKey: "searchXUsers") as? Bool ?? true
     }
 
     var launchAtLogin: Bool {
@@ -147,6 +152,7 @@ struct SettingsView: View {
                             .disabled(x.connecting || x.clientID == nil)
                     }
                 }
+                Toggle("Search X users when you type @ (about $0.05 a search)", isOn: $preferences.searchXUsers)
                 if let xError {
                     Text(xError)
                         .foregroundStyle(.red)

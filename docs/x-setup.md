@@ -9,8 +9,9 @@ X has no free API tier. It charges per request from prepaid credits ([pricing](h
 - A post: $0.015.
 - A post with a link: $0.20.
 - Connecting your account in pnow: $0.01, once.
+- A user found by the @ search: $0.01, so up to $0.05 for each search.
 
-pnow calls the API only when you post. Posting once a day costs about $0.45 a month.
+pnow calls the API when you post, and when you type `@` and 2 letters on X. It keeps the results until it quits, so the same letters cost only once. To turn the search off, open Settings (`⌘,`) and clear **Search X users when you type @**. Posting once a day costs about $0.45 a month.
 
 ## 1. Create the app
 

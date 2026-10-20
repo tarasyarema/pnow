@@ -79,6 +79,33 @@ enum DevNull {
     }
 
     /// "@user’s post 01a155a7"
+    /// dev-null.sh users for `query`, from the search its website uses. It is not part of the CLI
+    /// API, so callers treat a failure as no results.
+    static func searchUsers(_ query: String) async throws -> [Handle] {
+        struct Found: Decodable {
+            struct User: Decodable {
+                let username: String
+                let name: String?
+            }
+            let users: [User]
+        }
+        var search = URLComponents(url: base.appending(path: "search/users"), resolvingAgainstBaseURL: false)!
+        search.queryItems = [URLQueryItem(name: "q", value: query)]
+        var request = URLRequest(url: search.url!, timeoutInterval: 5)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+            throw PnowError("dev-null.sh search failed.")
+        }
+        return try JSONDecoder().decode(Found.self, from: data).users.map { Handle(username: $0.username, name: $0.name) }
+    }
+
+    /// "user" in https://dev-null.sh/@user/commits/<id>
+    static func author(of link: URL) -> String? {
+        link.pathComponents.first { $0.hasPrefix("@") }.map { String($0.dropFirst()) }
+    }
+
     static func describe(_ link: URL) -> String {
         let parts = link.pathComponents.filter { $0 != "/" }
         let author = parts.first { $0.hasPrefix("@") }

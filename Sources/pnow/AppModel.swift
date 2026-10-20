@@ -24,6 +24,20 @@ enum Destination: String, CaseIterable {
     }
 }
 
+/// Someone to mention: a handle, and the name a search found with it.
+struct Handle: Equatable {
+    let username: String
+    var name: String?
+}
+
+/// The "@name" being typed at the caret, and the handles that complete it.
+struct Mention: Equatable {
+    /// The "@" and the letters typed so far.
+    let range: NSRange
+    let handles: [Handle]
+    var selected = 0
+}
+
 struct ReplyTarget: Equatable {
     /// The post on dev-null.sh.
     var devNull: URL?
@@ -50,6 +64,12 @@ final class AppModel {
     }
     /// The selected row in Recent, while the keyboard is in the list.
     var selection: Int?
+    var mention: Mention?
+    /// The "@name" at the caret, also while it has no handles yet.
+    @ObservationIgnored private var mentionQuery: (range: NSRange, prefix: String)?
+    @ObservationIgnored private var mentionSearch: Task<Void, Never>?
+    /// Search results for this session, so the same letters never cost a second X search.
+    @ObservationIgnored private var searchCache: [String: [Handle]] = [:]
     /// Set when the composer opens: the clipboard holds an image that ⌘V would attach.
     var clipboardHasImage = false
     /// Bumped each time the composer opens, so the editor takes focus.
@@ -126,8 +146,58 @@ final class AppModel {
         selection.flatMap { visiblePosts.indices.contains($0) ? visiblePosts[$0] : nil }
     }
 
+    /// Handles for "@" + `prefix` on the one place this post goes: the ones in your history first,
+    /// then a search there. None for posts to both: the same person often has another handle on X.
+    func findHandles(at range: NSRange, prefix: String) {
+        if let query = mentionQuery, query.range == range, query.prefix == prefix { return }
+        let sameName = mentionQuery?.range.location == range.location
+        mentionQuery = (range, prefix)
+        mentionSearch?.cancel()
+        guard destination != .both else {
+            mention = nil
+            return
+        }
+
+        let onX = destination == .x
+        let key = "\(onX ? "x" : "dev-null"):\(prefix.lowercased())"
+        let local = history.handles(onX: onX)
+            .filter { $0.lowercased().hasPrefix(prefix.lowercased()) }
+            .map { Handle(username: $0) }
+        showHandles(local + (searchCache[key] ?? []), at: range, prefix: prefix, keepSelection: sameName)
+
+        // X bills each user a search finds, so it waits for 2 letters and a pause in typing.
+        guard searchCache[key] == nil, onX ? prefix.count >= 2 && x.isConnected && preferences.searchXUsers : !prefix.isEmpty else { return }
+        mentionSearch = Task {
+            try? await Task.sleep(for: .milliseconds(onX ? 400 : 150))
+            guard !Task.isCancelled else { return }
+            guard let found = try? await (onX ? x.searchUsers(prefix) : DevNull.searchUsers(prefix)) else { return }
+            searchCache[key] = found
+            guard !Task.isCancelled, mentionQuery?.range == range else { return }
+            showHandles(local + found, at: range, prefix: prefix, keepSelection: true)
+        }
+    }
+
+    func endMention() {
+        mentionQuery = nil
+        mentionSearch?.cancel()
+        mention = nil
+    }
+
+    /// Without your own handle, without repeats, and without the name you already typed in full.
+    private func showHandles(_ handles: [Handle], at range: NSRange, prefix: String, keepSelection: Bool) {
+        let own = destination == .x ? x.username : history.posts.lazy.compactMap { $0.link.flatMap(DevNull.author(of:)) }.first
+        var seen: Set<String> = [prefix.lowercased(), own?.lowercased() ?? ""]
+        let list = Array(handles.filter { seen.insert($0.username.lowercased()).inserted }.prefix(6))
+        guard !list.isEmpty else {
+            mention = nil
+            return
+        }
+        mention = Mention(range: range, handles: list, selected: keepSelection ? min(mention?.selected ?? 0, list.count - 1) : 0)
+    }
+
     func composerOpened() {
         selection = nil
+        endMention()
         clipboardHasImage = Attachments.clipboardHasImage()
         focusTick += 1
     }
@@ -261,6 +331,7 @@ final class AppModel {
         }
 
         if failed.isEmpty {
+            endMention()
             draft = ""
             attachments = []
             replyingTo = nil

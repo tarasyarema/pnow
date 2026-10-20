@@ -11,6 +11,7 @@ struct ComposerView: View {
     @Bindable var model: AppModel
     let checkForUpdates: () -> Void
     let openSettings: () -> Void
+    let acceptMention: (Int) -> Void
     let onHeightChange: (CGFloat) -> Void
     @FocusState private var editorFocused: Bool
     @FocusState private var searchFocused: Bool
@@ -32,6 +33,7 @@ struct ComposerView: View {
                 .padding(.bottom, -8)
             }
             editor
+            mentions
             attachments
             if case .failed(let message) = model.status {
                 Text(message)
@@ -84,6 +86,39 @@ struct ComposerView: View {
         .font(Self.editorFont)
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
+    }
+
+    /// Handles for the "@name" at the caret. ↑ ↓ choose, ⇥ or ↩ picks, esc hides them.
+    @ViewBuilder
+    private var mentions: some View {
+        if let mention = model.mention {
+            VStack(spacing: 2) {
+                ForEach(Array(mention.handles.enumerated()), id: \.offset) { index, handle in
+                    Button { acceptMention(index) } label: {
+                        HStack {
+                            Text("@\(handle.username)")
+                            if let name = handle.name, name.caseInsensitiveCompare(handle.username) != .orderedSame {
+                                Text(name)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            if index == mention.selected {
+                                Keycap("⇥")
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(index == mention.selected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 6))
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .font(.system(size: 14))
+            .padding(.horizontal, 15)
+            .padding(.bottom, 10)
+        }
     }
 
     @ViewBuilder

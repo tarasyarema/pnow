@@ -6,6 +6,8 @@ import SwiftUI
 /// the app you came from gets focus back.
 final class ComposerPanel: NSPanel {
     private let model: AppModel
+    /// Where esc hid the handles, so they stay hidden while you finish that name.
+    private var dismissedMention: Int?
 
     init(model: AppModel, checkForUpdates: @escaping () -> Void, openSettings: @escaping () -> Void) {
         self.model = model
@@ -25,7 +27,9 @@ final class ComposerPanel: NSPanel {
         hidesOnDeactivate = false
         isMovableByWindowBackground = true
 
-        let hostingView = NSHostingView(rootView: ComposerView(model: model, checkForUpdates: checkForUpdates, openSettings: openSettings) { [weak self] height in
+        let hostingView = NSHostingView(rootView: ComposerView(model: model, checkForUpdates: checkForUpdates, openSettings: openSettings, acceptMention: { [weak self] in
+            self?.acceptMention($0)
+        }) { [weak self] height in
             self?.fit(height: height)
         })
         // The panel follows the SwiftUI height itself, keeping its top edge in place.
@@ -36,8 +40,65 @@ final class ComposerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, handlePaste(event) || handleTab(event) || handleListKey(event) || handleSearchEscape(event) { return }
+        if event.type == .keyDown, handleMentionKey(event) || handlePaste(event) || handleTab(event) || handleListKey(event) || handleSearchEscape(event) { return }
         super.sendEvent(event)
+        if event.type == .keyDown || event.type == .leftMouseUp { updateMention() }
+    }
+
+    /// While handles show: ↑ ↓ choose, ⇥ or ↩ picks, esc hides them.
+    private func handleMentionKey(_ event: NSEvent) -> Bool {
+        guard let mention = model.mention, event.modifierFlags.intersection([.command, .option, .control]).isEmpty else { return false }
+        switch Int(event.keyCode) {
+        case kVK_DownArrow: model.mention?.selected = min(mention.selected + 1, mention.handles.count - 1)
+        case kVK_UpArrow: model.mention?.selected = max(mention.selected - 1, 0)
+        case kVK_Tab, kVK_Return, kVK_ANSI_KeypadEnter: acceptMention()
+        case kVK_Escape:
+            dismissedMention = mention.range.location
+            model.endMention()
+        default: return false
+        }
+        return true
+    }
+
+    /// Looks for "@name" right before the caret, at the end of a word.
+    private func updateMention() {
+        guard model.search == nil, let textView = firstResponder as? NSTextView else {
+            model.endMention()
+            return
+        }
+        let caret = textView.selectedRange()
+        let text = textView.string as NSString
+        let isName = { (index: Int) in
+            guard index >= 0, index < text.length, let scalar = UnicodeScalar(text.character(at: index)) else { return false }
+            return CharacterSet.alphanumerics.contains(scalar) && scalar.isASCII || scalar == "_" || scalar == "-"
+        }
+        var start = caret.location
+        while isName(start - 1) { start -= 1 }
+        let at = start - 1
+        guard caret.length == 0, at >= 0, text.character(at: at) == 0x40, !isName(at - 1), !isName(caret.location) else {
+            model.endMention()
+            dismissedMention = nil
+            return
+        }
+        guard at != dismissedMention else {
+            model.endMention()
+            return
+        }
+        model.findHandles(
+            at: NSRange(location: at, length: caret.location - at),
+            prefix: text.substring(with: NSRange(location: start, length: caret.location - start))
+        )
+    }
+
+    private func acceptMention(_ index: Int? = nil) {
+        guard let mention = model.mention, let textView = firstResponder as? NSTextView else { return }
+        let name = "@\(mention.handles[index ?? mention.selected].username) "
+        if textView.shouldChangeText(in: mention.range, replacementString: name) {
+            textView.replaceCharacters(in: mention.range, with: name)
+            textView.didChangeText()
+            textView.setSelectedRange(NSRange(location: mention.range.location + (name as NSString).length, length: 0))
+        }
+        model.endMention()
     }
 
     /// ⌘V attaches images from the clipboard. Text pastes as usual.

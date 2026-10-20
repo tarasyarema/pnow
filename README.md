@@ -17,6 +17,7 @@ Needs macOS 26 or later, and an SSH key that is on your GitHub account (dev-null
 | `⌃⌘P` | Open or close the composer, from any app (change it in Settings) |
 | `⌘↩` | Post |
 | `⇥` or `⌘T` | Post to dev-null.sh, X, or both (`⇧⇥` goes back) |
+| `@` | Suggests people on the place you post to: handles from your history first, then a search of dev-null.sh or X users (not when posting to both). `↑` `↓` choose, `⇥` or `↩` picks, `esc` hides them. X bills about $0.05 a search: turn it off in Settings |
 | `⌘V` | Attach the image in your clipboard (up to 3). Dropping image files works too |
 | `⌘R` | Reply to your last post |
 | `↓` | Go into Recent. There: `↑` `↓` move, `↩` opens, `X` opens on X, `R` replies, `esc` goes back |
